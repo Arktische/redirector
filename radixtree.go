@@ -9,79 +9,6 @@ const (
 	DOMAINTYP
 )
 
-type imapNode struct {
-	key int
-	val int
-}
-
-//
-type imap struct {
-	size int
-	arr  []imapNode
-}
-
-func (i *imap) get(b int) (val int, ok bool) {
-	size := len(i.arr)
-	for factor := 0; factor < size; factor++ {
-		if i.arr[(b+factor)%size].key == b {
-			return i.arr[(b+factor)%size].val, true
-		}
-	}
-	return -1, false
-}
-
-func (i *imap) exist(b int) (idx int, ok bool) {
-	size := len(i.arr)
-	for factor := 0; factor < size; factor++ {
-		if i.arr[(b+factor)%size].key == b {
-			return (b + factor) % size, true
-		}
-	}
-	return -1, false
-}
-
-func (i *imap) set(b int, idx int) {
-	if index, ok := i.exist(b); ok {
-		i.arr[idx].val = index
-		return
-	}
-	size := len(i.arr)
-	load := float32(i.size) / float32(size)
-	if load < 0.8 {
-		for factor := 0; factor < size; factor++ {
-			if i.arr[(b+factor)%size].key == -1 {
-				i.arr[(b+factor)%size].key = b
-				i.arr[(b+factor)%size].val = idx
-				i.size++
-				return
-			}
-		}
-	} else {
-		tmp := i.arr
-		i.arr = make([]imapNode, 2*size, 2*size)
-		for k := 0; k < 2*size; k++ {
-			i.arr[k].key = -1
-		}
-		for j := 0; j < size; j++ {
-			if tmp[j].key != -1 {
-				i.set(tmp[j].key, tmp[j].val)
-			}
-		}
-		return
-	}
-}
-
-func newimap() *imap {
-	i := &imap{
-		size: 0,
-		arr:  make([]imapNode, 8),
-	}
-	for j := 0; j < 8; j++ {
-		i.arr[j].key = -1
-	}
-	return i
-}
-
 // RadixTree compressed radix tree
 type RadixTree interface {
 	AddRoute(string, interface{}) error
@@ -98,7 +25,6 @@ type RadixNode struct {
 	child   []*RadixNode
 	indices []byte
 	handle  interface{}
-	m       []int
 }
 
 func min(x, y int) int {
@@ -195,7 +121,5 @@ walk:
 
 // NewRadixTree returns an empty radix tree node
 func NewRadixTree() *RadixNode {
-	return &RadixNode{
-		m: make([]int, 256),
-	}
+	return &RadixNode{}
 }

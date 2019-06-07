@@ -2,6 +2,7 @@ package redirector
 
 import (
 	"math/rand"
+	"sort"
 	"testing"
 	"time"
 )
@@ -28,22 +29,26 @@ func TestRadixTree(t *testing.T) {
 	t.Log(r.FindRoute("bilibili.tv"))
 }
 
-func TestImap(t *testing.T) {
-	m := newimap()
-	rand.Seed(2583953)
-	var testvec [32]int
-	for i := 0; i < 32; i++ {
-		testvec[i] = rand.Intn(32) + 1
-	}
-	for i := 0; i < 32; i++ {
-		m.set(testvec[i], i)
-	}
+func TestHashTrieTree(t *testing.T) {
+	r := NewHashTrieTree()
+	r.AddRoute("192.168.9.1", nil)
+	r.AddRoute("192.168.3.1", nil)
+	r.AddRoute("34.42.56.7", nil)
+	r.AddRoute("CDCD:910A:2222:5498:8475:1111:3900:2020", nil)
+	r.AddRoute("3f4c:8a70:5ef2:3425:8392:2912:a34f:8d32", nil)
 
-	for i := 0; i < 32; i++ {
-		t.Log(m.get(testvec[i]))
-	}
-	m.set(testvec[7], 7)
-	t.Log(m.get(testvec[7]))
+	t.Log(r.FindRoute("192.168.9.1"))
+	t.Log(r.FindRoute("192.145.3.5"))
+	t.Log(r.FindRoute("34.42.56.7"))
+	t.Log(r.FindRoute("3f4c:8a70:5ef2:3425:8392:2912:a34f:8d32"))
+
+	r.AddRoute("baidu.com", nil)
+	r.AddRoute("bilibili.com", nil)
+	r.AddRoute("bilibili.tv", nil)
+	r.AddRoute("bilibiligame.com", nil)
+
+	t.Log(r.FindRoute("www.bilibili.com"))
+	t.Log(r.FindRoute("bilibili.tv"))
 }
 
 func getRandomString(l int) string {
@@ -60,8 +65,8 @@ func getRandomString(l int) string {
 }
 
 const (
-	testvecsize   = 40960
-	inputvecsize  = 20
+	testvecsize   = 512
+	inputvecsize  = 2000
 	teststringlen = 256
 )
 
@@ -70,14 +75,17 @@ var inputvec [inputvecsize]string
 var flag bool
 var r *RadixNode = NewRadixTree()
 var m map[string]interface{} = make(map[string]interface{})
+var h *HashTrieNode = NewHashTrieTree()
 
 func readtestvec() {
 	for i := 0; i < testvecsize; i++ {
 		testvec[i] = getRandomString(teststringlen)
 	}
+	sort.Strings(testvec[:])
 	flag = true
 	for i := 0; i < testvecsize; i++ {
 		r.AddRoute(testvec[i], nil)
+		h.AddRoute(testvec[i], nil)
 		m[testvec[i]] = i
 	}
 }
@@ -117,54 +125,25 @@ func BenchmarkRadixTree(b *testing.B) {
 		_, _ = r.FindRoute(inputvec[j%inputvecsize])
 	}
 }
-
+func BenchmarkHashTrie(b *testing.B) {
+	b.ResetTimer()
+	b.StopTimer()
+	if !flag {
+		readinputvec()
+		readinputvec()
+	}
+	b.StartTimer()
+	for j := 0; j < b.N; j++ {
+		_, _ = h.FindRoute(inputvec[j%inputvecsize])
+	}
+}
 func BenchmarkDoubleArray(b *testing.B) {
 	b.ResetTimer()
 	b.StopTimer()
-	builder := DoubleArrayBuilder{}
+	builder := DoubleArrayTrieBuilder{}
 	builder.Build(testvec[:])
 	b.StartTimer()
 	for j := 0; j < b.N; j++ {
 		_, _ = builder.ExactMatchSearch(inputvec[j%inputvecsize])
-	}
-}
-
-const (
-	threshold = 16
-)
-
-func BenchmarkMapVsTraverse_Map(b *testing.B) {
-	b.ResetTimer()
-	b.StopTimer()
-	m := make(map[int]int)
-	for i := 0; i < threshold; i++ {
-		m[i] = rand.Int()
-	}
-	b.StartTimer()
-	target := 135
-	for j := 0; j < b.N; j++ {
-		_, ok := m[target]
-		if ok {
-			target++
-		}
-	}
-}
-
-func BenchmarkHashMapVsTraverse_Traverse(b *testing.B) {
-	b.ResetTimer()
-	b.StopTimer()
-	var m [threshold]int
-	for i := 0; i < threshold; i++ {
-		m[i] = rand.Int()
-	}
-	b.StartTimer()
-	target := 129
-	for j := 0; j < b.N; j++ {
-		for k := 0; k < len(m); k++ {
-			if target == m[k] {
-				target++
-				break
-			}
-		}
 	}
 }

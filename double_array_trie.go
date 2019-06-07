@@ -4,11 +4,11 @@ import (
 	"fmt"
 )
 
-type DoubleArray struct {
+type DoubleArrayTrie struct {
 	units UnitPool
 }
 
-func (da *DoubleArray) FromBytes(byts []byte) error {
+func (da *DoubleArrayTrie) FromBytes(byts []byte) error {
 	if len(byts)%4 != 0 {
 		return fmt.Errorf("invalid length of bytes")
 	}
@@ -25,7 +25,7 @@ func (da *DoubleArray) FromBytes(byts []byte) error {
 	return nil
 }
 
-func (da *DoubleArray) ToBytes() (byts []byte) {
+func (da *DoubleArrayTrie) ToBytes() (byts []byte) {
 	cnt := int(da.units.size())
 	byts = make([]byte, cnt*4)
 	for i := 0; i < cnt; i++ {
@@ -39,7 +39,7 @@ func (da *DoubleArray) ToBytes() (byts []byte) {
 	return
 }
 
-func (da *DoubleArray) ExactMatchSearch(key string) (value int, matched bool) {
+func (da *DoubleArrayTrie) ExactMatchSearch(key string) (value int, matched bool) {
 	if da.units.size() == 0 {
 		return 0, false
 	}
@@ -64,7 +64,7 @@ func (da *DoubleArray) ExactMatchSearch(key string) (value int, matched bool) {
 	return unit.value(), true
 }
 
-func (da *DoubleArray) CommonPrefixSearch(key string) (values []int) {
+func (da *DoubleArrayTrie) CommonPrefixSearch(key string) (values []int) {
 	values = make([]int, 0)
 	if da.units.size() == 0 {
 		return
@@ -204,27 +204,27 @@ func (up *UnitPool) resizeBuf(size uint32) {
 	up.pool = pool2
 }
 
-type DoubleArrayBuilder struct {
-	DoubleArray
+type DoubleArrayTrieBuilder struct {
+	DoubleArrayTrie
 	labels     []byte
 	extrasHead uint32
 
 	_extras []ExtraUnit
 }
 
-func (bd *DoubleArrayBuilder) resetExtra() {
+func (bd *DoubleArrayTrieBuilder) resetExtra() {
 	bd._extras = make([]ExtraUnit, NumExtra)
 }
 
-func (bd *DoubleArrayBuilder) resetLabel() {
+func (bd *DoubleArrayTrieBuilder) resetLabel() {
 	bd.labels = make([]byte, 0, 256)
 }
 
-func (bd *DoubleArrayBuilder) extras(id uint32) *ExtraUnit {
+func (bd *DoubleArrayTrieBuilder) extras(id uint32) *ExtraUnit {
 	return &bd._extras[id%NumExtra]
 }
 
-func (bd *DoubleArrayBuilder) Build(keyset []string) {
+func (bd *DoubleArrayTrieBuilder) Build(keyset []string) {
 	ks := make([][]byte, len(keyset))
 	for i := range keyset {
 		ks[i] = []byte(keyset[i] + "\x00")
@@ -232,7 +232,7 @@ func (bd *DoubleArrayBuilder) Build(keyset []string) {
 	bd.buildFromKeyset(ks)
 }
 
-func (bd *DoubleArrayBuilder) buildFromKeyset(keyset [][]byte) {
+func (bd *DoubleArrayTrieBuilder) buildFromKeyset(keyset [][]byte) {
 	var numUnits uint32 = 1
 	for numUnits < uint32(len(keyset)) {
 		numUnits <<= 1
@@ -257,7 +257,7 @@ func (bd *DoubleArrayBuilder) buildFromKeyset(keyset [][]byte) {
 	bd.labels = nil
 }
 
-func (bd *DoubleArrayBuilder) buildFromKeysetRange(
+func (bd *DoubleArrayTrieBuilder) buildFromKeysetRange(
 	keyset [][]byte,
 	begin uint32,
 	end uint32,
@@ -295,7 +295,7 @@ func (bd *DoubleArrayBuilder) buildFromKeysetRange(
 	bd.buildFromKeysetRange(keyset, lastBegin, end, depth+1, offset^uint32(lastLabel))
 }
 
-func (bd *DoubleArrayBuilder) arrangeFromKeyset(
+func (bd *DoubleArrayTrieBuilder) arrangeFromKeyset(
 	keyset [][]byte,
 	begin uint32,
 	end uint32,
@@ -341,7 +341,7 @@ func (bd *DoubleArrayBuilder) arrangeFromKeyset(
 	return offset
 }
 
-func (bd *DoubleArrayBuilder) findValidOffset(id uint32) (offset uint32) {
+func (bd *DoubleArrayTrieBuilder) findValidOffset(id uint32) (offset uint32) {
 	if bd.extrasHead >= bd.units.size() {
 		return bd.units.size() | (id & LowerMask)
 	}
@@ -360,7 +360,7 @@ func (bd *DoubleArrayBuilder) findValidOffset(id uint32) (offset uint32) {
 	return bd.units.size() | (id & LowerMask)
 }
 
-func (bd *DoubleArrayBuilder) isValidOffset(id uint32, offset uint32) bool {
+func (bd *DoubleArrayTrieBuilder) isValidOffset(id uint32, offset uint32) bool {
 	if bd.extras(offset).isUsed {
 		return false
 	}
@@ -379,7 +379,7 @@ func (bd *DoubleArrayBuilder) isValidOffset(id uint32, offset uint32) bool {
 	return true
 }
 
-func (bd *DoubleArrayBuilder) reserveID(id uint32) {
+func (bd *DoubleArrayTrieBuilder) reserveID(id uint32) {
 	if id >= bd.units.size() {
 		bd.expandUnits()
 	}
@@ -396,11 +396,11 @@ func (bd *DoubleArrayBuilder) reserveID(id uint32) {
 	bd.extras(id).isFixed = true
 }
 
-func (bd *DoubleArrayBuilder) numBlocks() uint32 {
+func (bd *DoubleArrayTrieBuilder) numBlocks() uint32 {
 	return bd.units.size() / BlockSize
 }
 
-func (bd *DoubleArrayBuilder) expandUnits() {
+func (bd *DoubleArrayTrieBuilder) expandUnits() {
 	var srcNumUnits = bd.units.size()
 	var srcNumBlocks = bd.numBlocks()
 
@@ -435,7 +435,7 @@ func (bd *DoubleArrayBuilder) expandUnits() {
 	bd.extras(bd.extrasHead).prev = destNumUnits - 1
 }
 
-func (bd *DoubleArrayBuilder) fixAllBlocks() {
+func (bd *DoubleArrayTrieBuilder) fixAllBlocks() {
 	var begin uint32
 	if bd.numBlocks() > NumExtraBlocks {
 		begin = bd.numBlocks() - NumExtraBlocks
@@ -447,7 +447,7 @@ func (bd *DoubleArrayBuilder) fixAllBlocks() {
 	}
 }
 
-func (bd *DoubleArrayBuilder) fixBlock(blockID uint32) {
+func (bd *DoubleArrayTrieBuilder) fixBlock(blockID uint32) {
 	var begin = blockID * BlockSize
 	var end = begin + BlockSize
 
